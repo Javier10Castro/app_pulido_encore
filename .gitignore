@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+encore.db
+files.zip
