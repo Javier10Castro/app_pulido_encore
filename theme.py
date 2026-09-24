@@ -25,8 +25,15 @@ def auto_scale(reference=(1920, 1080), limits=(0.7, 2.0)):
 
     La app está diseñada para una base de `reference` píxeles; en pantallas
     más grandes todo crece y en las más pequeñas todo se reduce, de modo que
-    el layout ocupe siempre el mismo porcentaje de la pantalla."""
+    el layout ocupe siempre el mismo porcentaje de la pantalla.
+
+    Debe llamarse ANTES de crear cualquier ventana de customtkinter: activa el
+    modo DPI-aware del proceso y evita que CTk re-escale y limite la ventana."""
     import ctypes
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)
+    except Exception:
+        pass
     try:
         w = ctypes.windll.user32.GetSystemMetrics(0)
         h = ctypes.windll.user32.GetSystemMetrics(1)

@@ -57,17 +57,26 @@ class Login(ctk.CTkFrame):
 
 class App(ctk.CTk):
     def __init__(self):
-        super().__init__()
         auto_scale()
+        super().__init__()
         db.init_db()
         self.title("EnCore · Control de Materiales")
         self.geometry("1280x800")
-        self.state("zoomed")
-        self.bind("<F11>", lambda _: self.attributes("-fullscreen", not self.attributes("-fullscreen")))
         self.minsize(900, 620)
         self.configure(fg_color=BG)
         self.user, self.views, self.current = None, {}, None
-        self.show_login()
+        self.bind("<F11>", lambda _: self.attributes("-fullscreen", not self.attributes("-fullscreen")))
+        self.bind("<Map>", self._fit_screen, add="+")
+        self._fit_screen()
+
+    def _fit_screen(self, _=None):
+        self.after(120, self._zoom)
+
+    def _zoom(self):
+        try:
+            self.state("zoomed")
+        except Exception:
+            pass
 
     def _clear(self):
         for w in self.winfo_children():
