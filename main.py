@@ -1,4 +1,7 @@
 """EnCore · Control de Materiales — punto de entrada.  Ejecuta:  python main.py"""
+import os
+import tkinter as tk
+
 import customtkinter as ctk
 
 import database as db
@@ -63,12 +66,23 @@ class App(ctk.CTk):
         self.title("EnCore · Control de Materiales")
         self.geometry("1280x800")
         self.minsize(900, 620)
+        self._set_icon()
         self.configure(fg_color=BG)
         self.user, self.views, self.current = None, {}, None
         self.bind("<F11>", lambda _: self.attributes("-fullscreen", not self.attributes("-fullscreen")))
         self.bind("<Map>", self._fit_screen, add="+")
         self.show_login()
         self._fit_screen()
+
+    def _set_icon(self):
+        path = os.path.join(BASE, "assets", "favicon.png")
+        if not os.path.exists(path):
+            return
+        try:
+            self._icon = tk.PhotoImage(file=path)
+            self.iconphoto(True, self._icon)
+        except Exception:
+            pass
 
     def _fit_screen(self, _=None):
         self.after(120, self._zoom)
