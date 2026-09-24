@@ -61,7 +61,7 @@ class App(ctk.CTk):
         db.init_db()
         self.title("EnCore · Control de Materiales")
         self.geometry("1280x800")
-        self.attributes("-fullscreen", True)
+        self.state("zoomed")
         self.bind("<F11>", lambda _: self.attributes("-fullscreen", not self.attributes("-fullscreen")))
         self.minsize(900, 620)
         self.configure(fg_color=BG)
