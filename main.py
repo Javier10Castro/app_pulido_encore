@@ -5,7 +5,7 @@ import customtkinter as ctk
 
 import database as db
 from theme import *
-from views import Capture, Dashboard, Employees, Materials, Records, Users
+from views import Dashboard, Employees, Materials, Records, Users
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -120,9 +120,9 @@ class App(ctk.CTk):
         self.content.grid_rowconfigure(0, weight=1)
 
         ctk.CTkLabel(sb, text="", image=logo(170)).pack(pady=(28, 24))
-        self.classes = {"dashboard": Dashboard, "records": Records, "capture": Capture,
+        self.classes = {"dashboard": Dashboard, "records": Records,
                         "employees": Employees, "materials": Materials}
-        items = [("dashboard", "Dashboard"), ("records", "Registros"), ("capture", "Capturar Datos"),
+        items = [("dashboard", "Dashboard"), ("records", "Registros"),
                  ("employees", "Empleados"), ("materials", "Materiales")]
         if user["is_admin"]:
             self.classes["users"] = Users

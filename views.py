@@ -83,7 +83,7 @@ class Dashboard(View):
         b.grid(row=1, column=0, sticky="nsew", padx=16, pady=(0, 12))
         b.grid_columnconfigure(0, weight=1)
 
-        specs = [("Capturar Datos", "Registrar material por empleado", "capture", ACCENT, ACCENT_HOVER),
+        specs = [("Registrar Datos", "Captura y consulta el historial", "records", ACCENT, ACCENT_HOVER),
                  ("Agregar Empleados", "Alta y gestión de personal", "employees", BLUE, BLUE_HOVER),
                  ("Agregar Materiales", "Catálogo de materiales", "materials", "#2E4A9E", "#3A5AB8")]
         self.actions = ctk.CTkFrame(b, fg_color="transparent")
@@ -212,105 +212,18 @@ class Dashboard(View):
 
 # ======================= REGISTROS =======================
 class Records(View):
-    title, subtitle = "Registros", "Historial de capturas: revisa, filtra, elimina y exporta a Excel"
+    title, subtitle = "Registros", "Captura la cantidad de material por empleado y consulta el historial"
 
     def __init__(self, app):
         super().__init__(app)
         self.is_admin = bool(app.user["is_admin"])
-        card_ = card(self)
-        card_.grid(row=1, column=0, sticky="nsew", padx=20, pady=(0, 20))
-        card_.grid_columnconfigure(0, weight=1)
-        card_.grid_rowconfigure(2, weight=1)
-
-        top = ctk.CTkFrame(card_, fg_color="transparent")
-        top.grid(row=0, column=0, sticky="ew", padx=18, pady=(14, 4))
-        label(top, "Historial de registros", 15, "bold").pack(side="left")
-        button(top, "Exportar a Excel", self.export, kind="blue", width=170).pack(side="right")
-
-        flt = ctk.CTkFrame(card_, fg_color="transparent")
-        flt.grid(row=1, column=0, sticky="ew", padx=18, pady=(4, 8))
-        self.f_turno = tk.StringVar(value="Todos")
-        self.f_mat = tk.StringVar(value="Todos")
-        self.f_per = tk.StringVar(value="Todo el historial")
-        self.mat_menu = None
-        for txt, var, vals in (("Turno", self.f_turno, ["Todos", "A", "B", "C"]),
-                               ("Material", self.f_mat, ["Todos"]),
-                               ("Periodo", self.f_per, list(PERIODS))):
-            label(flt, txt, 12, color=MUTED).pack(side="left", padx=(8, 6))
-            m = menu(flt, vals, var, command=lambda _: self.refresh(), width=150)
-            m.pack(side="left", padx=(0, 8))
-            if txt == "Material":
-                self.mat_menu = m
-
-        self.table = DataTable(card_, [("id", "ID", 50), ("fecha", "Fecha", 140), ("emp", "Empleado", 70),
-                                       ("nombre", "Nombre", 150), ("turno", "Turno", 60),
-                                       ("mat", "Material", 150), ("cant", "Cantidad", 80)], height=14)
-        self.table.grid(row=2, column=0, sticky="nsew", padx=14)
-
-        bt = ctk.CTkFrame(card_, fg_color="transparent")
-        bt.grid(row=3, column=0, sticky="ew", padx=14, pady=14)
-        self.del_btn = button(bt, "Eliminar registro", self.delete, kind="danger", width=170,
-                              state="normal" if self.is_admin else "disabled")
-        self.del_btn.pack(side="left")
-        if not self.is_admin:
-            label(bt, "Solo el administrador puede eliminar registros.",
-                  12, color=MUTED).pack(side="left", padx=12)
-        self.refresh()
-
-    def on_show(self):
-        vals = ["Todos"] + db.list_materials()
-        self.mat_menu.configure(values=vals)
-        if self.f_mat.get() not in vals:
-            self.f_mat.set("Todos")
-        self.refresh()
-
-    def refresh(self):
-        g = lambda v: None if v.get() == "Todos" else v.get()
-        rows = db.report_rows(g(self.f_turno), g(self.f_mat), PERIODS[self.f_per.get()])
-        self.table.set_rows([(r["id"], r["fecha"], r["empleado"], r["nombre"], r["turno"],
-                              r["material"], r["cantidad"]) for r in rows])
-
-    def delete(self):
-        if not self.is_admin:
-            return messagebox.showwarning("Eliminar", "Solo el administrador puede eliminar registros.")
-        s = self.table.selected()
-        if not s:
-            return messagebox.showinfo("Eliminar", "Selecciona un registro de la lista.")
-        if messagebox.askyesno("Eliminar",
-                               f"¿Eliminar el registro #{s[0]}?\n{s[3]} · {s[5]} → {s[6]} unidades "
-                               f"({s[1]})\nEsta acción no se puede deshacer."):
-            db.delete_report(int(s[0]))
-            self.refresh()
-
-    def export(self):
-        path = filedialog.asksaveasfilename(
-            title="Exportar a Excel", defaultextension=".xlsx",
-            filetypes=[("Libro de Excel", "*.xlsx")],
-            initialfile=f"EnCore_Export_{datetime.now():%Y%m%d_%H%M%S}.xlsx")
-        if not path:
-            return
-        try:
-            exporter.export_xlsx(path)
-        except PermissionError:
-            return messagebox.showerror("Error", "El archivo está abierto. Ciérralo e inténtalo de nuevo.")
-        messagebox.showinfo("Exportado", f"Datos exportados correctamente:\n{path}")
-
-
-# ======================= CAPTURAR DATOS =======================
-class Capture(View):
-    title, subtitle = "Capturar Datos", "Registra la cantidad de material por empleado, paso a paso"
-
-    def __init__(self, app):
-        super().__init__(app)
-        wrap = ctk.CTkScrollableFrame(self, fg_color="transparent")
-        wrap.grid(row=1, column=0, sticky="nsew", padx=16)
-        wrap.grid_columnconfigure(0, weight=1)
-        self.card = card(wrap, width=620)
-        self.card.grid(row=0, column=0, pady=8)
-        fit_width(self, self.card)
-        c = self.card
         self.emp = None
+        self.body = ctk.CTkFrame(self, fg_color="transparent")
+        self.body.grid(row=1, column=0, sticky="nsew", padx=16, pady=(0, 12))
 
+        # ---- captura ----
+        c = card(self.body)
+        label(c, "Capturar datos", 17, "bold").pack(anchor="w", padx=22, pady=(20, 0))
         field(c, "Paso 1 · Número de empleado")
         r = ctk.CTkFrame(c, fg_color="transparent")
         r.pack(fill="x", padx=22)
@@ -321,28 +234,73 @@ class Capture(View):
         self.num_entry.bind("<Return>", lambda e: self.validate())
         self.val_btn = button(r, "Validar", self.validate, width=110)
         self.val_btn.pack(side="left", padx=(10, 0))
-        self.status = label(c, "", 12, color=MUTED, anchor="w", justify="left", wraplength=520)
+        self.status = label(c, "", 12, color=MUTED, anchor="w", justify="left", wraplength=320)
         self.status.pack(anchor="w", padx=22, pady=(8, 0))
-
         field(c, "Paso 2 · Material")
         self.mat = tk.StringVar(value=BLANK)
         self.mat_menu = menu(c, [BLANK], self.mat, command=self._on_mat)
         self.mat_menu.pack(fill="x", padx=22)
-
         field(c, "Paso 3 · Cantidad")
         self.qty = tk.StringVar()
         digits_only(self.qty, 7)
         self.qty.trace_add("write", lambda *_: self._update_save())
         self.qty_entry = entry(c, textvariable=self.qty, placeholder_text="Solo números")
         self.qty_entry.pack(fill="x", padx=22)
-
         self.save_btn = button(c, "Guardar registro", self.save, kind="blue", height=48)
         self.save_btn.pack(fill="x", padx=22, pady=(24, 6))
         button(c, "Limpiar / cambiar empleado", self.reset, kind="ghost").pack(fill="x", padx=22, pady=(0, 24))
+        self.form = c
+
+        # ---- historial ----
+        t = card(self.body)
+        top = ctk.CTkFrame(t, fg_color="transparent")
+        top.pack(fill="x", padx=18, pady=(16, 8))
+        label(top, "Historial de registros", 15, "bold").pack(side="left")
+        button(top, "Exportar a Excel", self.export, kind="blue", width=170).pack(side="right")
+        flt = ctk.CTkFrame(t, fg_color="transparent")
+        flt.pack(fill="x", padx=18, pady=(0, 8))
+        self.f_turno = tk.StringVar(value="Todos")
+        self.f_mat = tk.StringVar(value="Todos")
+        self.f_per = tk.StringVar(value="Todo el historial")
+        self.filter_mat = None
+        for txt, var, vals in (("Turno", self.f_turno, ["Todos", "A", "B", "C"]),
+                               ("Material", self.f_mat, ["Todos"]),
+                               ("Periodo", self.f_per, list(PERIODS))):
+            label(flt, txt, 12, color=MUTED).pack(side="left", padx=(8, 6))
+            m = menu(flt, vals, var, command=lambda _: self.refresh(), width=150)
+            m.pack(side="left", padx=(0, 8))
+            if txt == "Material":
+                self.filter_mat = m
+        self.table = DataTable(t, [("id", "ID", 50), ("fecha", "Fecha", 140), ("emp", "Empleado", 70),
+                                   ("nombre", "Nombre", 150), ("turno", "Turno", 60),
+                                   ("mat", "Material", 150), ("cant", "Cantidad", 80)], height=14)
+        self.table.pack(fill="both", expand=True, padx=14, pady=(4, 0))
+        bt = ctk.CTkFrame(t, fg_color="transparent")
+        bt.pack(fill="x", padx=14, pady=14)
+        self.del_btn = button(bt, "Eliminar registro", self.delete, kind="danger", width=170,
+                              state="normal" if self.is_admin else "disabled")
+        self.del_btn.pack(side="left")
+        if not self.is_admin:
+            label(bt, "Solo el administrador puede eliminar registros.", 12, color=MUTED).pack(side="left", padx=12)
+        self.tcard = t
+
+        self._k = None
+        self.bind("<Configure>", self._layout, add="+")
         self.reset()
+
+    def _layout(self, e):
+        k = e.width >= 1000
+        if k != self._k:
+            self._k = k
+            reflow(self.body, [self.form, self.tcard], 2 if k else 1, weights=(2, 3) if k else None, expand_rows=True)
 
     def on_show(self):
         self.reset()
+        vals = ["Todos"] + db.list_materials()
+        self.filter_mat.configure(values=vals)
+        if self.f_mat.get() not in vals:
+            self.f_mat.set("Todos")
+        self.refresh()
 
     def reset(self):
         self.emp = None
@@ -389,6 +347,38 @@ class Capture(View):
         db.add_report(self.emp["id"], self.mat.get(), int(self.qty.get()))
         messagebox.showinfo("Guardado", "Registro guardado correctamente.")
         self.reset()
+        self.refresh()
+
+    def refresh(self):
+        g = lambda v: None if v.get() == "Todos" else v.get()
+        rows = db.report_rows(g(self.f_turno), g(self.f_mat), PERIODS[self.f_per.get()])
+        self.table.set_rows([(r["id"], r["fecha"], r["empleado"], r["nombre"], r["turno"],
+                              r["material"], r["cantidad"]) for r in rows])
+
+    def delete(self):
+        if not self.is_admin:
+            return messagebox.showwarning("Eliminar", "Solo el administrador puede eliminar registros.")
+        s = self.table.selected()
+        if not s:
+            return messagebox.showinfo("Eliminar", "Selecciona un registro de la lista.")
+        if messagebox.askyesno("Eliminar",
+                               f"¿Eliminar el registro #{s[0]}?\n{s[3]} · {s[5]} → {s[6]} unidades "
+                               f"({s[1]})\nEsta acción no se puede deshacer."):
+            db.delete_report(int(s[0]))
+            self.refresh()
+
+    def export(self):
+        path = filedialog.asksaveasfilename(
+            title="Exportar a Excel", defaultextension=".xlsx",
+            filetypes=[("Libro de Excel", "*.xlsx")],
+            initialfile=f"EnCore_Export_{datetime.now():%Y%m%d_%H%M%S}.xlsx")
+        if not path:
+            return
+        try:
+            exporter.export_xlsx(path)
+        except PermissionError:
+            return messagebox.showerror("Error", "El archivo está abierto. Ciérralo e inténtalo de nuevo.")
+        messagebox.showinfo("Exportado", f"Datos exportados correctamente:\n{path}")
 
 
 # ======================= EMPLEADOS =======================
