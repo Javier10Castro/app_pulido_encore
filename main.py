@@ -1,6 +1,5 @@
 """EnCore · Control de Materiales — punto de entrada.  Ejecuta:  python main.py"""
 import os
-import tkinter as tk
 
 import customtkinter as ctk
 
@@ -75,12 +74,12 @@ class App(ctk.CTk):
         self._fit_screen()
 
     def _set_icon(self):
-        path = os.path.join(BASE, "assets", "favicon.png")
-        if not os.path.exists(path):
+        """Ícono de la ventana y barra de tareas (solo el favicon, no el logo)."""
+        ico = os.path.join(BASE, "assets", "favicon.ico")
+        if not os.path.exists(ico):
             return
         try:
-            self._icon = tk.PhotoImage(file=path)
-            self.iconphoto(True, self._icon)
+            self.iconbitmap(ico)
         except Exception:
             pass
 
