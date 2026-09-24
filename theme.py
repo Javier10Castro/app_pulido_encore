@@ -50,7 +50,7 @@ def font(size=13, weight="normal"):
 
 
 def logo(width):
-    img = Image.open(os.path.join(BASE, "assets", "logo_light.png")).convert("RGBA")
+    img = Image.open(os.path.join(BASE, "assets", "favicon.png")).convert("RGBA")
     img = img.crop(img.split()[3].point(lambda a: 255 if a > 20 else 0).getbbox())
     size = (width, int(width * img.height / img.width))
     return ctk.CTkImage(light_image=img, dark_image=img, size=size)
