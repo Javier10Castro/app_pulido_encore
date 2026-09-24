@@ -67,6 +67,7 @@ class App(ctk.CTk):
         self.user, self.views, self.current = None, {}, None
         self.bind("<F11>", lambda _: self.attributes("-fullscreen", not self.attributes("-fullscreen")))
         self.bind("<Map>", self._fit_screen, add="+")
+        self.show_login()
         self._fit_screen()
 
     def _fit_screen(self, _=None):
