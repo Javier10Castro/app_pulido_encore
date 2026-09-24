@@ -149,6 +149,11 @@ def add_report(emp_id, material, cantidad):
                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 
 
+def delete_report(rid):
+    with _c() as c:
+        c.execute("DELETE FROM reporte WHERE id=?", (rid,))
+
+
 def report_rows(turno=None, material=None, days=None):
     q, p = "SELECT * FROM reporte WHERE 1=1", []
     if turno:

@@ -1,7 +1,8 @@
 import sqlite3
 import tkinter as tk
 from collections import defaultdict
-from tkinter import messagebox
+from datetime import datetime
+from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -9,6 +10,7 @@ from matplotlib.figure import Figure
 from matplotlib.ticker import FuncFormatter, MaxNLocator
 
 import database as db
+import exporter
 from theme import *
 
 PERIODS = {"Últimos 7 días": 7, "Últimos 30 días": 30, "Últimos 90 días": 90, "Todo el historial": None}
@@ -120,13 +122,6 @@ class Dashboard(View):
         self.c_turno = Chart(self.chart_frame, "Distribución por turno")
         self.c_emp = Chart(self.chart_frame, "Top empleados")
         self.charts = [self.c_day, self.c_mat, self.c_turno, self.c_emp]
-
-        tc = card(b)
-        tc.grid(row=4, column=0, sticky="ew", padx=8, pady=8)
-        label(tc, "Últimos registros", 15, "bold").pack(anchor="w", padx=18, pady=(14, 8))
-        self.table = DataTable(tc, [("fecha", "Fecha", 140), ("emp", "Empleado", 80), ("nombre", "Nombre", 160),
-                                    ("turno", "Turno", 60), ("mat", "Material", 140), ("cant", "Cantidad", 80)])
-        self.table.pack(fill="both", expand=True, padx=14, pady=(0, 14))
         self.bind("<Configure>", self._layout, add="+")
 
     def _layout(self, e):
@@ -159,8 +154,6 @@ class Dashboard(View):
         self._donut(by("turno"))
         emps = sorted(self._sum(rows, "nombre").items(), key=lambda x: -x[1])
         self._bars(self.c_emp, emps[:5], CHART[2])
-        self.table.set_rows([(r["fecha"], r["empleado"], r["nombre"], r["turno"], r["material"], r["cantidad"])
-                             for r in rows[:50]])
 
     @staticmethod
     def _sum(rows, key):
@@ -209,6 +202,92 @@ class Dashboard(View):
                    autopct="%1.0f%%", pctdistance=.8)
             ax.grid(False)
         self.c_turno.canvas.draw_idle()
+
+
+# ======================= REGISTROS =======================
+class Records(View):
+    title, subtitle = "Registros", "Historial de capturas: revisa, filtra, elimina y exporta a Excel"
+
+    def __init__(self, app):
+        super().__init__(app)
+        self.is_admin = bool(app.user["is_admin"])
+        card_ = card(self)
+        card_.grid(row=1, column=0, sticky="nsew", padx=20, pady=(0, 20))
+        card_.grid_columnconfigure(0, weight=1)
+        card_.grid_rowconfigure(2, weight=1)
+
+        top = ctk.CTkFrame(card_, fg_color="transparent")
+        top.grid(row=0, column=0, sticky="ew", padx=18, pady=(14, 4))
+        label(top, "Historial de registros", 15, "bold").pack(side="left")
+        button(top, "Exportar a Excel", self.export, kind="blue", width=170).pack(side="right")
+
+        flt = ctk.CTkFrame(card_, fg_color="transparent")
+        flt.grid(row=1, column=0, sticky="ew", padx=18, pady=(4, 8))
+        self.f_turno = tk.StringVar(value="Todos")
+        self.f_mat = tk.StringVar(value="Todos")
+        self.f_per = tk.StringVar(value="Todo el historial")
+        self.mat_menu = None
+        for txt, var, vals in (("Turno", self.f_turno, ["Todos", "A", "B", "C"]),
+                               ("Material", self.f_mat, ["Todos"]),
+                               ("Periodo", self.f_per, list(PERIODS))):
+            label(flt, txt, 12, color=MUTED).pack(side="left", padx=(8, 6))
+            m = menu(flt, vals, var, command=lambda _: self.refresh(), width=150)
+            m.pack(side="left", padx=(0, 8))
+            if txt == "Material":
+                self.mat_menu = m
+
+        self.table = DataTable(card_, [("id", "ID", 50), ("fecha", "Fecha", 140), ("emp", "Empleado", 70),
+                                       ("nombre", "Nombre", 150), ("turno", "Turno", 60),
+                                       ("mat", "Material", 150), ("cant", "Cantidad", 80)], height=14)
+        self.table.grid(row=2, column=0, sticky="nsew", padx=14)
+
+        bt = ctk.CTkFrame(card_, fg_color="transparent")
+        bt.grid(row=3, column=0, sticky="ew", padx=14, pady=14)
+        self.del_btn = button(bt, "Eliminar registro", self.delete, kind="danger", width=170,
+                              state="normal" if self.is_admin else "disabled")
+        self.del_btn.pack(side="left")
+        if not self.is_admin:
+            label(bt, "Solo el administrador puede eliminar registros.",
+                  12, color=MUTED).pack(side="left", padx=12)
+        self.refresh()
+
+    def on_show(self):
+        vals = ["Todos"] + db.list_materials()
+        self.mat_menu.configure(values=vals)
+        if self.f_mat.get() not in vals:
+            self.f_mat.set("Todos")
+        self.refresh()
+
+    def refresh(self):
+        g = lambda v: None if v.get() == "Todos" else v.get()
+        rows = db.report_rows(g(self.f_turno), g(self.f_mat), PERIODS[self.f_per.get()])
+        self.table.set_rows([(r["id"], r["fecha"], r["empleado"], r["nombre"], r["turno"],
+                              r["material"], r["cantidad"]) for r in rows])
+
+    def delete(self):
+        if not self.is_admin:
+            return messagebox.showwarning("Eliminar", "Solo el administrador puede eliminar registros.")
+        s = self.table.selected()
+        if not s:
+            return messagebox.showinfo("Eliminar", "Selecciona un registro de la lista.")
+        if messagebox.askyesno("Eliminar",
+                               f"¿Eliminar el registro #{s[0]}?\n{s[3]} · {s[5]} → {s[6]} unidades "
+                               f"({s[1]})\nEsta acción no se puede deshacer."):
+            db.delete_report(int(s[0]))
+            self.refresh()
+
+    def export(self):
+        path = filedialog.asksaveasfilename(
+            title="Exportar a Excel", defaultextension=".xlsx",
+            filetypes=[("Libro de Excel", "*.xlsx")],
+            initialfile=f"EnCore_Export_{datetime.now():%Y%m%d_%H%M%S}.xlsx")
+        if not path:
+            return
+        try:
+            exporter.export_xlsx(path)
+        except PermissionError:
+            return messagebox.showerror("Error", "El archivo está abierto. Ciérralo e inténtalo de nuevo.")
+        messagebox.showinfo("Exportado", f"Datos exportados correctamente:\n{path}")
 
 
 # ======================= CAPTURAR DATOS =======================
