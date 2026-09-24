@@ -58,6 +58,7 @@ class Login(ctk.CTkFrame):
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
+        auto_scale()
         db.init_db()
         self.title("EnCore · Control de Materiales")
         self.geometry("1280x800")

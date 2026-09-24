@@ -20,6 +20,24 @@ FONT = "Segoe UI"
 BLANK = "— Selecciona —"
 
 
+def auto_scale(reference=(1920, 1080), limits=(0.7, 2.0)):
+    """Ajusta el tamaño de toda la UI según la resolución física de la pantalla.
+
+    La app está diseñada para una base de `reference` píxeles; en pantallas
+    más grandes todo crece y en las más pequeñas todo se reduce, de modo que
+    el layout ocupe siempre el mismo porcentaje de la pantalla."""
+    import ctypes
+    try:
+        w = ctypes.windll.user32.GetSystemMetrics(0)
+        h = ctypes.windll.user32.GetSystemMetrics(1)
+    except Exception:
+        w, h = reference
+    s = max(limits[0], min(limits[1], min(w / reference[0], h / reference[1])))
+    ctk.set_widget_scaling(s)
+    ctk.set_window_scaling(s)
+    return s
+
+
 def font(size=13, weight="normal"):
     return ctk.CTkFont(family=FONT, size=size, weight=weight)
 

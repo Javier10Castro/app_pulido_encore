@@ -47,7 +47,13 @@ class Chart(ctk.CTkFrame):
         self.canvas = FigureCanvasTkAgg(self.fig, master=self)
         w = self.canvas.get_tk_widget()
         w.configure(bg=CARD, highlightthickness=0, height=260)
+        w.bind("<Configure>", self._resize, add="+")
         w.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+
+    def _resize(self, e):
+        if e.width > 20 and e.height > 20:
+            self.fig.set_size_inches(e.width / self.fig.dpi, e.height / self.fig.dpi)
+            self.canvas.draw_idle()
 
     def axes(self):
         self.fig.clear()
