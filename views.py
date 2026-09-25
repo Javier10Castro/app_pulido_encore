@@ -215,8 +215,11 @@ class Records(View):
     title, subtitle = "Registros", "Captura la cantidad de material por empleado y consulta el historial"
 
     def __init__(self, app):
+        self.role = app.user["rol"]
+        self.is_admin = self.role == "admin"
+        if self.role == "captura":
+            self.subtitle = "Captura la cantidad de material por empleado"
         super().__init__(app)
-        self.is_admin = bool(app.user["is_admin"])
         self.emp = None
         self.body = ctk.CTkFrame(self, fg_color="transparent")
         self.body.grid(row=1, column=0, sticky="nsew", padx=16, pady=(0, 12))
@@ -289,6 +292,11 @@ class Records(View):
         self.reset()
 
     def _layout(self, e):
+        if self.role == "captura":
+            if self._k != "captura":
+                self._k = "captura"
+                reflow(self.body, [self.form], 1, expand_rows=True)
+            return
         k = e.width >= 1000
         if k != self._k:
             self._k = k
@@ -616,14 +624,15 @@ class Users(View):
         field(f, "Contraseña")
         self.p = entry(f, placeholder_text="Mínimo 6 caracteres", show="•")
         self.p.pack(fill="x", padx=22)
-        self.admin = ctk.CTkSwitch(f, text="Es administrador", font=font(13), progress_color=ACCENT)
-        self.admin.pack(anchor="w", padx=22, pady=16)
+        field(f, "Rol")
+        self.rol = tk.StringVar(value=db.ROLES["usuario"])
+        menu(f, list(db.ROLES.values()), self.rol).pack(fill="x", padx=22, pady=(4, 16))
         self.msg = label(f, "", 12, color=MUTED, anchor="w", wraplength=280, justify="left")
         self.msg.pack(anchor="w", padx=22)
         button(f, "Crear usuario", self.create, height=46).pack(fill="x", padx=22, pady=(12, 22))
         t = self.tcard
         label(t, "Usuarios", 15, "bold").pack(anchor="w", padx=18, pady=(16, 8))
-        self.table = DataTable(t, [("id", "ID", 60), ("user", "Usuario", 220), ("rol", "Rol", 120)], height=10)
+        self.table = DataTable(t, [("id", "ID", 60), ("user", "Usuario", 220), ("rol", "Rol", 160)], height=10)
         self.table.pack(fill="both", expand=True, padx=14)
         button(t, "Eliminar", self.delete, kind="danger", width=110).pack(anchor="w", padx=14, pady=14)
         self._k = None
@@ -636,14 +645,15 @@ class Users(View):
             reflow(self.body, [self.form, self.tcard], 2 if k else 1, weights=(2, 3) if k else None, expand_rows=True)
 
     def on_show(self):
-        self.table.set_rows([(u["id"], u["username"], "Admin" if u["is_admin"] else "Usuario") for u in db.list_users()])
+        self.table.set_rows([(u["id"], u["username"], db.ROLES.get(u["rol"], u["rol"])) for u in db.list_users()])
 
     def create(self):
         u, p = self.u.get().strip(), self.p.get()
         if len(u) < 3 or len(p) < 6:
             return self.msg.configure(text="Usuario (3+) y contraseña (6+) requeridos.", text_color=WARN)
+        usr = {v: k for k, v in db.ROLES.items()}[self.rol.get()]
         try:
-            db.create_user(u, p, bool(self.admin.get()))
+            db.create_user(u, p, usr)
         except sqlite3.IntegrityError:
             return self.msg.configure(text=f"El usuario «{u}» ya existe.", text_color=DANGER)
         self.u.delete(0, "end")

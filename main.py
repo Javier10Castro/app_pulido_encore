@@ -10,6 +10,12 @@ from views import Dashboard, Employees, Materials, Records, Users
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
+ROLE_PERMISSIONS = {
+    "admin": {"dashboard", "records", "employees", "materials", "users"},
+    "usuario": {"dashboard", "records", "employees", "materials"},
+    "captura": {"records"},
+}
+
 
 class Login(ctk.CTkFrame):
     def __init__(self, app):
@@ -50,7 +56,7 @@ class Login(ctk.CTkFrame):
                 return self.err.configure(text="Usuario (3+ caracteres) y contraseña (6+) requeridos.")
             if p != self.p2.get():
                 return self.err.configure(text="Las contraseñas no coinciden.")
-            db.create_user(u, p, True)
+            db.create_user(u, p, rol="admin")
         row = db.verify_user(u, p)
         if not row:
             return self.err.configure(text="Usuario o contraseña incorrectos.")
@@ -120,13 +126,14 @@ class App(ctk.CTk):
         self.content.grid_rowconfigure(0, weight=1)
 
         ctk.CTkLabel(sb, text="", image=logo(170)).pack(pady=(28, 24))
-        self.classes = {"dashboard": Dashboard, "records": Records,
-                        "employees": Employees, "materials": Materials}
-        items = [("dashboard", "Dashboard"), ("records", "Registros"),
-                 ("employees", "Empleados"), ("materials", "Materiales")]
-        if user["is_admin"]:
-            self.classes["users"] = Users
-            items.append(("users", "Usuarios"))
+        role = user["rol"]
+        perm = ROLE_PERMISSIONS.get(role, frozenset())
+        classes = {"dashboard": Dashboard, "records": Records, "employees": Employees,
+                   "materials": Materials, "users": Users}
+        titles = {"dashboard": "Dashboard", "records": "Registros", "employees": "Empleados",
+                  "materials": "Materiales", "users": "Usuarios"}
+        self.classes = {k: classes[k] for k in titles if k in perm}
+        items = [(k, titles[k]) for k in titles if k in perm]
         self.nav = {}
         for key, text in items:
             b = ctk.CTkButton(sb, text=text, anchor="w", height=46, corner_radius=14, fg_color="transparent",
@@ -135,11 +142,14 @@ class App(ctk.CTk):
             b.pack(fill="x", padx=16, pady=3)
             self.nav[key] = b
         button(sb, "Cerrar sesión", self.show_login, kind="ghost").pack(side="bottom", fill="x", padx=16, pady=20)
-        label(sb, f"{user['username']}  ·  {'Admin' if user['is_admin'] else 'Usuario'}", 12,
+        label(sb, f"{user['username']}  ·  {db.ROLES.get(role, role)}", 12,
               color=MUTED).pack(side="bottom", pady=(0, 4))
-        self.show("dashboard")
+        self.show("records" if role == "captura" else "dashboard")
 
     def show(self, key):
+        role = self.user["rol"] if self.user is not None and "rol" in self.user.keys() else None
+        if role not in ROLE_PERMISSIONS or key not in ROLE_PERMISSIONS[role]:
+            return
         if self.current:
             self.views[self.current].grid_forget()
             self.nav[self.current].configure(fg_color="transparent")

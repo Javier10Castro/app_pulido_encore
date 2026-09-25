@@ -9,12 +9,15 @@ from datetime import datetime, timedelta
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "encore.db")
 
+ROLES = {"admin": "Admin", "usuario": "Usuario", "captura": "Captura de Datos"}
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS usuarios(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE COLLATE NOCASE NOT NULL,
     password TEXT NOT NULL,
-    is_admin INTEGER NOT NULL DEFAULT 0);
+    is_admin INTEGER NOT NULL DEFAULT 0,
+    rol TEXT NOT NULL DEFAULT 'usuario');
 CREATE TABLE IF NOT EXISTS empleados(
     id INTEGER PRIMARY KEY,
     nombre TEXT NOT NULL,
@@ -41,6 +44,16 @@ def _c():
 def init_db():
     with _c() as c:
         c.executescript(SCHEMA)
+        _migrate(c)
+
+
+def _migrate(c):
+    """Agrega la columna `rol` a tablas `usuarios` existentes sin pérdida de datos.
+    Fuente de permisos = `rol`; `is_admin` se conserva como espejo temporal."""
+    cols = {r[1] for r in c.execute("PRAGMA table_info(usuarios)").fetchall()}
+    if "rol" not in cols:
+        c.execute("ALTER TABLE usuarios ADD COLUMN rol TEXT NOT NULL DEFAULT 'usuario'")
+        c.execute("UPDATE usuarios SET rol='admin' WHERE is_admin=1")
 
 
 def _hash(pw, salt=None):
@@ -60,10 +73,12 @@ def user_count():
         return c.execute("SELECT COUNT(*) FROM usuarios").fetchone()[0]
 
 
-def create_user(username, password, is_admin=False):
+def create_user(username, password, rol="usuario"):
+    if rol not in ROLES:
+        raise ValueError(f"Rol inválido: {rol!r}. Roles válidos: {', '.join(ROLES)}")
     with _c() as c:
-        c.execute("INSERT INTO usuarios(username,password,is_admin) VALUES(?,?,?)",
-                  (username, _hash(password), int(is_admin)))
+        c.execute("INSERT INTO usuarios(username,password,is_admin,rol) VALUES(?,?,?,?)",
+                  (username, _hash(password), int(rol == "admin"), rol))
 
 
 def verify_user(username, password):
@@ -74,7 +89,7 @@ def verify_user(username, password):
 
 def list_users():
     with _c() as c:
-        return c.execute("SELECT id,username,is_admin FROM usuarios ORDER BY username").fetchall()
+        return c.execute("SELECT id,username,is_admin,rol FROM usuarios ORDER BY username").fetchall()
 
 
 def delete_user(uid):
